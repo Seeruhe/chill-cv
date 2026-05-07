@@ -1,0 +1,12 @@
+node_modules/
+build/
+dist/
+3d-album-stack/dist/
+public/3d-album-stack/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+.vercel

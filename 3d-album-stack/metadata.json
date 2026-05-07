@@ -1,0 +1,6 @@
+{
+  "name": "3D Album Stack",
+  "description": "An immersive 3D scrolling stack of albums with expansion animations and smooth infinite looping.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
