@@ -19,6 +19,36 @@ import { formatTime } from './utils/time';
 
 // --- App ---
 
+function parseLRC(lrc: string): { time: number | null; text: string }[] {
+  const out: { time: number | null; text: string }[] = [];
+  for (const raw of lrc.split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (/^\[(ar|ti|al|by|offset|length|re|ve):/i.test(line)) continue;
+
+    const stampRe = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+    const stamps: number[] = [];
+    let m: RegExpExecArray | null;
+    let lastIndex = 0;
+    while ((m = stampRe.exec(line)) !== null) {
+      const min = parseInt(m[1], 10);
+      const sec = parseInt(m[2], 10);
+      const fracStr = m[3] ?? '';
+      const frac = fracStr ? parseInt(fracStr, 10) / Math.pow(10, fracStr.length) : 0;
+      stamps.push(min * 60 + sec + frac);
+      lastIndex = m.index + m[0].length;
+    }
+    const text = line.slice(lastIndex).trim();
+    if (!text) continue;
+    if (stamps.length === 0) {
+      out.push({ time: null, text });
+    } else {
+      for (const t of stamps) out.push({ time: t, text });
+    }
+  }
+  return out.sort((a, b) => (a.time ?? Number.POSITIVE_INFINITY) - (b.time ?? Number.POSITIVE_INFINITY));
+}
+
 export default function App() {
   const [hasLaunched, setHasLaunched] = useState(false);
   const [screenIndex, setScreenIndex] = useState<0 | 1>(() => (typeof window !== 'undefined' && window.location.hash === '#stack' ? 1 : 0));
@@ -45,9 +75,13 @@ export default function App() {
   const [showAiConsole, setShowAiConsole] = useState(false);
 
   // Lyrics
-  const [trackLyrics, setTrackLyrics] = useState<string | null>(null);
+  type LyricLine = { time: number | null; text: string };
+  type LyricsData = { lines: LyricLine[]; hasSync: boolean };
+  const [trackLyrics, setTrackLyrics] = useState<LyricsData | null>(null);
   const [isLyricsLoading, setIsLyricsLoading] = useState(false);
-  const lyricsCacheRef = useRef<Map<string, string | null>>(new Map());
+  const lyricsCacheRef = useRef<Map<string, LyricsData | null>>(new Map());
+  const lyricsScrollRef = useRef<HTMLDivElement | null>(null);
+  const activeLineRef = useRef<HTMLDivElement | null>(null);
   const galleryRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const volumeBarRef = useRef<HTMLDivElement>(null);
@@ -101,7 +135,7 @@ export default function App() {
     currentTrackIndexRef.current = currentTrackIndex;
   }, [currentTrackIndex]);
 
-  // Fetch lyrics for current track from lyrics.ovh, cache per track
+  // Fetch synced lyrics for current track from lrclib.net, cache per track
   useEffect(() => {
     const artist = currentTrack.artist;
     const cleanTitle = currentTrack.title
@@ -123,15 +157,26 @@ export default function App() {
     setTrackLyrics(null);
 
     fetch(
-      `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(cleanTitle)}`,
+      `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(cleanTitle)}`,
       { signal: controller.signal },
     )
       .then((response) => (response.ok ? response.json() : null))
-      .then((data: { lyrics?: string } | null) => {
+      .then((data: { syncedLyrics?: string; plainLyrics?: string } | null) => {
         if (cancelled) return;
-        const lyrics = data?.lyrics?.trim() || null;
-        lyricsCacheRef.current.set(cacheKey, lyrics);
-        setTrackLyrics(lyrics);
+        let result: LyricsData | null = null;
+        if (data?.syncedLyrics) {
+          const lines = parseLRC(data.syncedLyrics);
+          if (lines.length) result = { lines, hasSync: true };
+        } else if (data?.plainLyrics) {
+          const lines = data.plainLyrics
+            .split('\n')
+            .map((t) => t.trim())
+            .filter(Boolean)
+            .map((text) => ({ time: null, text }));
+          if (lines.length) result = { lines, hasSync: false };
+        }
+        lyricsCacheRef.current.set(cacheKey, result);
+        setTrackLyrics(result);
       })
       .catch(() => {
         if (cancelled) return;
@@ -148,6 +193,31 @@ export default function App() {
       controller.abort();
     };
   }, [currentTrack.artist, currentTrack.title]);
+
+  // Index of the active line based on currentTime (synced lyrics only)
+  const activeLineIdx = (() => {
+    if (!trackLyrics?.hasSync) return -1;
+    let idx = -1;
+    for (let i = 0; i < trackLyrics.lines.length; i++) {
+      const t = trackLyrics.lines[i].time;
+      if (t == null) continue;
+      if (t <= currentTime) idx = i;
+      else break;
+    }
+    return idx;
+  })();
+
+  // Auto-center the active line within the lyrics container (no page scroll)
+  useEffect(() => {
+    const container = lyricsScrollRef.current;
+    const line = activeLineRef.current;
+    if (!container || !line) return;
+    const containerRect = container.getBoundingClientRect();
+    const lineRect = line.getBoundingClientRect();
+    const offset =
+      lineRect.top - containerRect.top - containerRect.height / 2 + lineRect.height / 2;
+    container.scrollTo({ top: container.scrollTop + offset, behavior: 'smooth' });
+  }, [activeLineIdx]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -949,34 +1019,71 @@ export default function App() {
                 </div>
               </div>
             </div>
-
-          {/* Lyrics Section */}
-          <div className={`p-3 transition-colors ${isDarkMode ? 'bg-black' : 'bg-gray-50/40'}`}>
-            <div className="flex items-center gap-2 opacity-60 mb-2">
-              <Music2 size={12} className={isDarkMode ? 'text-white' : 'text-black'} />
-              <div className="text-[9px] font-mono tracking-[3px] uppercase">
-                {lang === 'EN' ? 'Lyrics' : '歌词'}
-              </div>
-            </div>
-            <div className="max-h-[160px] overflow-y-auto custom-scrollbar pr-1">
-              {isLyricsLoading ? (
-                <div className={`text-[11px] font-mono opacity-30 ${isDarkMode ? 'text-white' : 'text-gray-500'}`}>
-                  ...
-                </div>
-              ) : trackLyrics ? (
-                <div className={`text-[11px] leading-relaxed whitespace-pre-line ${isDarkMode ? 'text-white/70' : 'text-gray-600'}`}>
-                  {trackLyrics}
-                </div>
-              ) : (
-                <div className={`text-[11px] italic opacity-40 text-center py-6 ${isDarkMode ? 'text-white/60' : 'text-gray-500'}`}>
-                  ♪ instrumental ♪
-                </div>
-              )}
-            </div>
-          </div>
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
+      </motion.div>
+
+      {/* --- Lyrics drift panel (left side, mirrors the discovery wall) --- */}
+      <motion.div
+        initial={{ opacity: 0, x: -40 }}
+        animate={hasLaunched ? { opacity: 1, x: 0 } : {}}
+        transition={{ duration: 1, delay: 0.9 }}
+        className="hidden xl:flex xl:absolute xl:left-12 w-72 h-[560px] mt-0 pt-0 z-20 items-center"
+      >
+        <div className="w-full px-2 text-center">
+          <div className="flex items-center gap-2 opacity-40 mb-4 justify-center">
+            <Music2 size={11} className={isDarkMode ? 'text-white' : 'text-[#6c2b30]'} />
+            <div className="text-[9px] font-mono tracking-[4px] uppercase truncate">
+              {lang === 'EN' ? 'Lyrics' : '歌词'} — {currentTrack.title.replace(/\s*\(feat\.[^)]*\)/i, '').replace(/\s*\[feat\.[^\]]*\]/i, '')}
+            </div>
+          </div>
+          <div
+            ref={lyricsScrollRef}
+            className="max-h-[460px] overflow-y-auto no-scrollbar"
+            style={{
+              maskImage:
+                'linear-gradient(to bottom, transparent 0, black 24px, black calc(100% - 32px), transparent 100%)',
+              WebkitMaskImage:
+                'linear-gradient(to bottom, transparent 0, black 24px, black calc(100% - 32px), transparent 100%)',
+            }}
+          >
+            {isLyricsLoading ? (
+              <div className={`text-[10px] font-mono opacity-30 py-4 ${isDarkMode ? 'text-white' : 'text-[#6c2b30]'}`}>
+                ...
+              </div>
+            ) : trackLyrics ? (
+              <div
+                className="py-2"
+                style={{ fontFamily: 'Georgia, "Times New Roman", serif', letterSpacing: '0.015em' }}
+              >
+                {trackLyrics.lines.map((line, i) => {
+                  const isActive = i === activeLineIdx;
+                  const dimmedColor = isDarkMode ? 'text-white/30' : 'text-[#6c2b30]/35';
+                  const activeColor = isDarkMode ? 'text-white' : 'text-[#6c2b30]';
+                  const staticColor = isDarkMode ? 'text-white/55' : 'text-[#6c2b30]/70';
+                  const colorCls = trackLyrics.hasSync ? (isActive ? activeColor : dimmedColor) : staticColor;
+                  return (
+                    <div
+                      key={i}
+                      ref={isActive ? activeLineRef : undefined}
+                      className={`text-[13.5px] italic leading-[2.05] transition-all duration-300 ${colorCls} ${isActive ? 'scale-[1.02] font-medium' : ''}`}
+                    >
+                      {line.text}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div
+                className={`text-[14px] italic opacity-40 py-6 text-center ${isDarkMode ? 'text-white/60' : 'text-[#6c2b30]'}`}
+                style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+              >
+                ♪ instrumental ♪
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
 
