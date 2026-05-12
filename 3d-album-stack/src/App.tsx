@@ -23,7 +23,6 @@ interface Album {
   image?: string;
   desc: string;
   pills: string[];
-  cta: string;
   story: Record<StoryLang, string[]>;
 }
 
@@ -47,7 +46,6 @@ const ALBUMS: Album[] = [
     image: "projects/chill-cv.png",
     desc: "An interactive CV with a retro radio Home and a 3D project stack — the project you are reading right now.",
     pills: ["TYPESCRIPT", "TAILWIND v4", "VERCEL"],
-    cta: "READ",
     story: {
       en: [
         "Chill CV ports the Chill FM frontend architecture into a self-hosted resume. The Home screen keeps the music interface as a brand vibe; the Stack screen replaces albums with personal projects, and the AI assistant becomes a resume archivist powered by LongCat.",
@@ -74,7 +72,6 @@ const ALBUMS: Album[] = [
     image: "projects/jarvis.png",
     desc: "A personal AI assistant exploring the leap from RAG to a real memory system — three-layer memory with confidence decay and a challenge loop.",
     pills: ["AGENT", "MEMORY", "LLM", "OPENCLAW"],
-    cta: "READ",
     story: {
       en: [
         "Jarvis treats RAG as a transitional form — search dressed up as memory. A real agent needs persistent, evolving, challengeable recollection. The project is a working bench for that thesis: a personal AI assistant whose memory layer is the product.",
@@ -101,7 +98,6 @@ const ALBUMS: Album[] = [
     image: "projects/indextts.png",
     desc: "End-to-end TTS inference service from zero — vLLM-backed IndexTTS 1.5/2.0, 8-GPU concurrent serving, fine-tuned on business corpus.",
     pills: ["VLLM", "INDEXTTS", "RTX 4090", "FINE-TUNE"],
-    cta: "READ",
     story: {
       en: [
         "焦点视界's TTS line needed a production inference stack — IndexTTS 1.5 and 2.0 both — with concurrency, voice fidelity, and an observable SLA. There was no service to inherit; the path was from zero, with the company's GPU pool as the canvas.",
@@ -128,7 +124,6 @@ const ALBUMS: Album[] = [
     image: "projects/vds.png",
     desc: "Cross-platform auto-delivery for virtual goods — Douyin / Kuaishou / Xiaohongshu / Xianyu / Video Account — fullstack, with Agent integration.",
     pills: ["FASTAPI", "NEXT.JS", "CELERY", "AGENT-SDK"],
-    cta: "READ",
     story: {
       en: [
         "Virtual-goods sellers run codes through five different platforms — Douyin, Kuaishou, Xiaohongshu, Xianyu, Video Account — most of which expose no clean delivery API. Manual fulfillment is the bottleneck. VDS exists to remove the human from the loop.",
@@ -155,7 +150,6 @@ const ALBUMS: Album[] = [
     image: "projects/gpu-cluster.png",
     desc: "23-node × 8-card RTX 4090 cluster — 184 GPUs total. PCIe passthrough, Ansible-batched provisioning, Prometheus / Grafana end-to-end observability.",
     pills: ["RTX 4090", "ANSIBLE", "PROMETHEUS", "PCIE"],
-    cta: "READ",
     story: {
       en: [
         "The AI product line needed a GPU substrate sized for both training-adjacent experiments and round-the-clock inference. The brief: 23 nodes, 8 cards each — 184 RTX 4090s — with consistent OS images, predictable PCIe topology, and observable health from day one.",
@@ -182,7 +176,6 @@ const ALBUMS: Album[] = [
     image: "projects/bastion-ops.png",
     desc: "Two years on the operations side — bastion hosts, database audit, log pipelines — the engineering habits that later carried into the GPU cluster.",
     pills: ["JUMPSERVER", "GRAFANA", "FILEBEAT", "LOGSTASH"],
-    cta: "READ",
     story: {
       en: [
         "The pre-AI chapter — two years at 杭州思福迪信息技术 building and keeping operations infrastructure alive. The product surface was internal: bastion hosts and a database audit system that other teams depended on 24/7.",
@@ -294,8 +287,6 @@ const Card: React.FC<{
   const bright = Math.max(0.32, 0.4 + normY * 0.6);
   const vis = y > -CARD_H - 10 && y < STAGE_H + 10;
 
-  const lightBg = ['#f5f0e8', '#e8e8f5', '#f0f5e8'].includes(album.bg);
-  const ctaFg = lightBg ? '#fff' : album.bg;
   const wikiContext = WIKI_CONTEXT[album.hl];
   const story = [
     ...album.story[storyLang],
@@ -345,7 +336,6 @@ const Card: React.FC<{
             <span className="nav-lnk">About</span>
             <span className="nav-lnk">Tracks</span>
             <span className="nav-lnk">Story</span>
-            <span className="nav-btn" style={{ background: album.ac, color: ctaFg }}>{album.cta}</span>
           </div>
         </div>
         <div className="card-body">
@@ -423,7 +413,6 @@ const Card: React.FC<{
                 <aside className="article-sidebar">
                   <h3>{storyLang === 'en' ? 'Related Listening' : '延伸聆听'}</h3>
                   <div className="exp-pills">
-                    <div className="exp-pill ac" style={{ background: album.ac, color: ctaFg }}>{album.cta}</div>
                     {album.pills.map((p, idx) => (
                       <div key={idx} className="exp-pill">{p}</div>
                     ))}
