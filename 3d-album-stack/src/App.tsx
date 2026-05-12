@@ -568,10 +568,17 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let lastWheelTime = 0;
     const handleWheel = (e: WheelEvent) => {
       if (activeMode === 'full') return;
       e.preventDefault();
-      targetRef.current = mod(targetRef.current + e.deltaY * 0.7, N * STEP);
+      const dir = Math.sign(e.deltaY);
+      if (dir === 0) return;
+      const now = performance.now();
+      if (now - lastWheelTime < 60) return;
+      lastWheelTime = now;
+      const nearestStep = Math.round(targetRef.current / STEP);
+      targetRef.current = mod((nearestStep + dir) * STEP, N * STEP);
       if (!rafRef.current) rafRef.current = requestAnimationFrame(smoothLoop);
     };
 
