@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, type MouseEvent, type PointerEvent, type CSSProperties } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Pause, SkipBack, SkipForward, Quote, Send, Terminal, History, Loader2, X } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Quote, Send, Terminal, History, Loader2, X, Music2 } from 'lucide-react';
 import { IntroOverlay } from './components/IntroOverlay';
 import { StackScreen } from './components/StackScreen';
 import { MusicGalleryItem } from './components/gallery/MusicGalleryItem';
@@ -43,6 +43,11 @@ export default function App() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [showAiConsole, setShowAiConsole] = useState(false);
+
+  // Lyrics
+  const [trackLyrics, setTrackLyrics] = useState<string | null>(null);
+  const [isLyricsLoading, setIsLyricsLoading] = useState(false);
+  const lyricsCacheRef = useRef<Map<string, string | null>>(new Map());
   const galleryRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const volumeBarRef = useRef<HTMLDivElement>(null);
@@ -95,6 +100,54 @@ export default function App() {
   useEffect(() => {
     currentTrackIndexRef.current = currentTrackIndex;
   }, [currentTrackIndex]);
+
+  // Fetch lyrics for current track from lyrics.ovh, cache per track
+  useEffect(() => {
+    const artist = currentTrack.artist;
+    const cleanTitle = currentTrack.title
+      .replace(/\s*\(feat\.[^)]*\)/gi, '')
+      .replace(/\s*\[feat\.[^\]]*\]/gi, '')
+      .replace(/\s+(feat\.|ft\.)\s+.*$/i, '')
+      .trim();
+    const cacheKey = `${artist}::${cleanTitle}`;
+
+    if (lyricsCacheRef.current.has(cacheKey)) {
+      setTrackLyrics(lyricsCacheRef.current.get(cacheKey) ?? null);
+      setIsLyricsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    setIsLyricsLoading(true);
+    setTrackLyrics(null);
+
+    fetch(
+      `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(cleanTitle)}`,
+      { signal: controller.signal },
+    )
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { lyrics?: string } | null) => {
+        if (cancelled) return;
+        const lyrics = data?.lyrics?.trim() || null;
+        lyricsCacheRef.current.set(cacheKey, lyrics);
+        setTrackLyrics(lyrics);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        lyricsCacheRef.current.set(cacheKey, null);
+        setTrackLyrics(null);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setIsLyricsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [currentTrack.artist, currentTrack.title]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -896,6 +949,31 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+          {/* Lyrics Section */}
+          <div className={`p-3 transition-colors ${isDarkMode ? 'bg-black' : 'bg-gray-50/40'}`}>
+            <div className="flex items-center gap-2 opacity-60 mb-2">
+              <Music2 size={12} className={isDarkMode ? 'text-white' : 'text-black'} />
+              <div className="text-[9px] font-mono tracking-[3px] uppercase">
+                {lang === 'EN' ? 'Lyrics' : '歌词'}
+              </div>
+            </div>
+            <div className="max-h-[160px] overflow-y-auto custom-scrollbar pr-1">
+              {isLyricsLoading ? (
+                <div className={`text-[11px] font-mono opacity-30 ${isDarkMode ? 'text-white' : 'text-gray-500'}`}>
+                  ...
+                </div>
+              ) : trackLyrics ? (
+                <div className={`text-[11px] leading-relaxed whitespace-pre-line ${isDarkMode ? 'text-white/70' : 'text-gray-600'}`}>
+                  {trackLyrics}
+                </div>
+              ) : (
+                <div className={`text-[11px] italic opacity-40 text-center py-6 ${isDarkMode ? 'text-white/60' : 'text-gray-500'}`}>
+                  ♪ instrumental ♪
+                </div>
+              )}
+            </div>
+          </div>
             </motion.div>
           )}
         </AnimatePresence>
