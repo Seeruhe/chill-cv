@@ -887,7 +887,7 @@ export default function App() {
                   <div className="flex items-center gap-2">
                     <Terminal size={10} className={isDarkMode ? 'text-white' : 'text-accent'} />
                     <span className={`text-[9px] font-mono uppercase tracking-[2px] ${isDarkMode ? 'text-white/80' : 'text-gray-500'}`}>
-                      {lang === 'EN' ? 'Archivist Terminal' : '档案管理员终端'}
+                      {lang === 'EN' ? 'Self Archive' : '自述档案'}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 opacity-40">
@@ -963,9 +963,9 @@ export default function App() {
                     <Terminal size={18} className={isDarkMode ? 'text-white' : 'text-accent'} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold tracking-tight">{lang === 'EN' ? 'Archivist Assistant' : '档案检索助手'}</h3>
+                    <h3 className="text-sm font-bold tracking-tight">{lang === 'EN' ? 'First-Person Archive' : '档案本人'}</h3>
                     <p className="text-[10px] font-mono opacity-40 uppercase tracking-[2px] mt-0.5">
-                      {lang === 'EN' ? 'AI Personnel Interface' : '人工智能交互接口'}
+                      {lang === 'EN' ? 'No narrator, just me' : '本人亲答 · 无中间人'}
                     </p>
                   </div>
                 </div>
